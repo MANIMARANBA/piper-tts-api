@@ -15,7 +15,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY . .
+
+# Clone Piper repository
+RUN git clone https://github.com/rhasspy/piper.git . && \
+    git checkout master
 
 # Build Piper
 RUN cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install && \
@@ -42,32 +45,39 @@ RUN apt-get update && \
         espeak-ng-data \
         libespeak-ng1 \
         libgomp1 \
-        ca-certificates && \
+        ca-certificates \
+        curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
-COPY requirements.txt /tmp/
-RUN pip3 install -r /tmp/requirements.txt
+# Download requirements.txt and install Python packages
+RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/requirements.txt" -o /tmp/requirements.txt && \
+    pip3 install -r /tmp/requirements.txt
+
+WORKDIR /app
 
 # Copy files from build stage
 COPY --from=build /build/install /app/piper
 COPY --from=build /build/models /app/models
 
-WORKDIR /app
+# Download API service file
+RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/api_service.py" -o api_service.py && \
+    chmod +x api_service.py
 
-# Create output directory
-RUN mkdir -p output && chmod 777 output
+# Create output directory with proper permissions
+RUN mkdir -p output && \
+    chmod 777 output && \
+    chown -R nobody:nogroup /app
 
 # Set environment variables
 ENV PATH="/app/piper/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/app/piper/lib"
 ENV ESPEAK_DATA_PATH="/usr/share/espeak-ng-data"
 
-# Copy API service file
-COPY api_service.py .
+# Switch to non-root user
+USER nobody
 
 # Expose API port
 EXPOSE 8000
 
-# Start FastAPI server
-CMD ["uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start FastAPI server with debug logging
+CMD ["uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]

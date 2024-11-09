@@ -4,6 +4,11 @@ import subprocess
 import os
 from datetime import datetime
 from pydantic import BaseModel
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Piper TTS API")
 
@@ -17,12 +22,15 @@ async def text_to_speech(request: TextToSpeechRequest):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"/app/output/speech_{timestamp}.wav"
         
+        logger.debug(f"Creating speech file: {output_file}")
+        
         cmd = [
             "/app/piper/bin/piper",
             "--model", "/app/models/en_US-kathleen-low.onnx",
-            "--output_file", output_file,
-            "--speaker", str(request.speaker_id)
+            "--output_file", output_file
         ]
+        
+        logger.debug(f"Running command: {' '.join(cmd)}")
         
         process = subprocess.Popen(
             cmd,
@@ -34,9 +42,19 @@ async def text_to_speech(request: TextToSpeechRequest):
         
         stdout, stderr = process.communicate(input=request.text)
         
+        logger.debug(f"Process output - stdout: {stdout}, stderr: {stderr}")
+        
         if process.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"TTS Error: {stderr}")
+            error_msg = f"TTS Error: {stderr}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        if not os.path.exists(output_file):
+            error_msg = f"Output file not created: {output_file}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
             
+        logger.debug(f"Returning file: {output_file}")
         return FileResponse(
             output_file,
             media_type="audio/wav",
@@ -44,8 +62,17 @@ async def text_to_speech(request: TextToSpeechRequest):
         )
         
     except Exception as e:
+        logger.exception("Error in text_to_speech")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    try:
+        # Test if piper is accessible
+        cmd = ["/app/piper/bin/piper", "--help"]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            return {"status": "unhealthy", "error": result.stderr}
+        return {"status": "healthy"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
