@@ -30,7 +30,7 @@ async def text_to_speech(request: TextToSpeechRequest):
             "--output_file", output_file
         ]
         
-        logger.debug(f"Running command: {" ".join(cmd)}")
+        logger.debug(f"Running command: {' '.join(cmd)}")
         
         process = subprocess.Popen(
             cmd,
@@ -68,6 +68,7 @@ async def text_to_speech(request: TextToSpeechRequest):
 @app.get("/health")
 async def health_check():
     try:
+        # Test if piper is accessible
         cmd = ["/app/piper/bin/piper", "--help"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -75,7 +76,3 @@ async def health_check():
         return {"status": "healthy"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
