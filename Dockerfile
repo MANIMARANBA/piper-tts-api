@@ -16,12 +16,10 @@ RUN apt-get update && \
 
 WORKDIR /build
 
-# Clone Piper repository
+# Clone and build Piper
 RUN git clone https://github.com/rhasspy/piper.git . && \
-    git checkout master
-
-# Build Piper
-RUN cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install && \
+    git checkout master && \
+    cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install && \
     cmake --build build --config Release && \
     cmake --install build
 
@@ -49,19 +47,20 @@ RUN apt-get update && \
         curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Download requirements.txt and install Python packages
-RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/requirements.txt" -o /tmp/requirements.txt && \
-    pip3 install -r /tmp/requirements.txt
-
 WORKDIR /app
 
-# Copy files from build stage
-COPY --from=build /build/install /app/piper
+# Create necessary directories
+RUN mkdir -p /app/piper/bin /app/models /app/output
+
+# Copy the built piper binary and models
+COPY --from=build /build/install/bin/piper /app/piper/bin/piper
 COPY --from=build /build/models /app/models
 
-# Download API service file
-RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/app_service.py" -o api_service.py && \
-    chmod +x api_service.py
+# Install Python requirements and API service
+RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/requirements.txt" -o requirements.txt && \
+    pip3 install -r requirements.txt && \
+    curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/app_service.py" -o app_service.py && \
+    chmod +x app_service.py
 
 # Create output directory with proper permissions
 RUN mkdir -p output && \
@@ -70,8 +69,12 @@ RUN mkdir -p output && \
 
 # Set environment variables
 ENV PATH="/app/piper/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/app/piper/lib"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV ESPEAK_DATA_PATH="/usr/share/espeak-ng-data"
+
+# Verify piper installation
+RUN ls -la /app/piper/bin/piper && \
+    /app/piper/bin/piper --help
 
 # Switch to non-root user
 USER nobody
@@ -79,5 +82,5 @@ USER nobody
 # Expose API port
 EXPOSE 8000
 
-# Start FastAPI server with debug logging
+# Start FastAPI server
 CMD ["uvicorn", "app_service:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
