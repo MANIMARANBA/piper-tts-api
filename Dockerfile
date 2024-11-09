@@ -43,8 +43,11 @@ RUN apt-get update && \
         libespeak-ng1 \
         libgomp1 \
         ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip3 install fastapi uvicorn piper-tts
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+COPY requirements.txt /tmp/
+RUN pip3 install -r /tmp/requirements.txt
 
 # Copy files from build stage
 COPY --from=build /build/install /app/piper
@@ -60,11 +63,11 @@ ENV PATH="/app/piper/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/app/piper/lib"
 ENV ESPEAK_DATA_PATH="/usr/share/espeak-ng-data"
 
-# Expose API port
-EXPOSE 8000
-
 # Copy API service file
 COPY api_service.py .
+
+# Expose API port
+EXPOSE 8000
 
 # Start FastAPI server
 CMD ["uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -14,11 +14,9 @@ class TextToSpeechRequest(BaseModel):
 @app.post("/tts")
 async def text_to_speech(request: TextToSpeechRequest):
     try:
-        # Create unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"/app/output/speech_{timestamp}.wav"
         
-        # Run piper command
         cmd = [
             "/app/piper/bin/piper",
             "--model", "/app/models/en_US-kathleen-low.onnx",
@@ -26,7 +24,6 @@ async def text_to_speech(request: TextToSpeechRequest):
             "--speaker", str(request.speaker_id)
         ]
         
-        # Pass text through stdin
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -40,7 +37,6 @@ async def text_to_speech(request: TextToSpeechRequest):
         if process.returncode != 0:
             raise HTTPException(status_code=500, detail=f"TTS Error: {stderr}")
             
-        # Return the audio file
         return FileResponse(
             output_file,
             media_type="audio/wav",
