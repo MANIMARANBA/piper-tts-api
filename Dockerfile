@@ -60,7 +60,7 @@ COPY --from=build /build/install /app/piper
 COPY --from=build /build/models /app/models
 
 # Download API service file
-RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/api_service.py" -o api_service.py && \
+RUN curl -L "https://raw.githubusercontent.com/MANIMARANBA/piper-tts-api/main/app_service.py" -o api_service.py && \
     chmod +x api_service.py
 
 # Create output directory with proper permissions
@@ -80,4 +80,4 @@ USER nobody
 EXPOSE 8000
 
 # Start FastAPI server with debug logging
-CMD ["uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
+CMD ["uvicorn", "app_service:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
